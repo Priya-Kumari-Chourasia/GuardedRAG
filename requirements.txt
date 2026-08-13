@@ -9,3 +9,5 @@ qdrant-client==1.12.2
 pytest==8.3.4
 fastembed==0.8.0
 pyyaml==6.0.3
+bcrypt==4.2.1
+pyjwt==2.10.1

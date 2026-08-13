@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from qdrant_client import QdrantClient
 
+from app.api.auth import router as auth_router
 from app.core.config import get_settings
 
 app = FastAPI(title="PKC Secure Knowledge Assistant")
+app.include_router(auth_router)
 
 
 @app.get("/health")
