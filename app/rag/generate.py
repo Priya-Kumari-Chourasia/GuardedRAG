@@ -31,10 +31,21 @@ QUESTION: {question}"""
 # Matches citation markers like [fin-q3-2025-report::c07] -- doc_id (letters,
 # digits, hyphens) + "::" + chunk suffix (e.g. c07), mirroring how ingest.py
 # builds chunk_id as f"{doc_id}::c{i:02d}". Accepts both ASCII [] and the
-# fullwidth 【】 brackets seen from Groq's models in practice -- rejecting the
-# fullwidth form would turn a correctly-cited, grounded answer into a false
-# refusal, exactly backwards from what the bracket check is for.
-_CITATION_RE = re.compile(r"[\[【]([\w.-]+::[\w-]+)[\]】]")
+# fullwidth 【】 brackets seen from Groq's models in practice, AND both ASCII
+# hyphen (U+002D) and the Unicode look-alikes Groq's models have been
+# observed substituting inside doc_ids -- confirmed live: "diwali holiday"
+# question came back as 【co‑holiday‑calendar‑2026::c02】 using U+2011
+# NON-BREAKING HYPHEN throughout, which the ASCII-only class silently failed
+# to match, treating a correctly-cited, grounded answer as uncited. Same
+# failure shape as the fullwidth-bracket case: rejecting a look-alike
+# character turns a good answer into a false refusal, exactly backwards from
+# what this check exists for.
+#
+# Public (not _-prefixed): app.guardrails.citations (G7) reuses this exact
+# pattern rather than maintaining a second regex that could drift out of
+# sync with what this module actually parses.
+_HYPHENS = r"\-‐‑‒–"
+CITATION_RE = re.compile(rf"[\[【]([\w.{_HYPHENS}]+::[\w{_HYPHENS}]+)[\]】]")
 
 
 @dataclass
@@ -71,11 +82,16 @@ def _parse_citations(answer: str, hits: list[Hit]) -> list[Citation]:
     """
     by_chunk_id = {h.chunk_id: h for h in hits}
     seen: dict[str, Citation] = {}
-    for marker in _CITATION_RE.findall(answer):
-        hit = by_chunk_id.get(marker)
+    for marker in CITATION_RE.findall(answer):
+        # Normalize Unicode hyphen look-alikes back to ASCII before lookup --
+        # real chunk_ids (built in ingest.py) only ever use ASCII '-'.
+        # Without this, a marker the regex above correctly recognized as
+        # citation-shaped would still fail to resolve to any hit.
+        normalized = re.sub(f"[{_HYPHENS}]", "-", marker)
+        hit = by_chunk_id.get(normalized)
         if hit is None:
             continue
-        seen[marker] = Citation(chunk_id=hit.chunk_id, doc_id=hit.doc_id, doc_title=hit.doc_title)
+        seen[normalized] = Citation(chunk_id=hit.chunk_id, doc_id=hit.doc_id, doc_title=hit.doc_title)
     return list(seen.values())
 
 
@@ -116,28 +132,15 @@ async def generate_answer(
     response = await get_groq_client().chat(messages)
     citations = _parse_citations(response.text, hits)
 
-    # Non-empty hits doesn't mean a groundable answer -- retrieval can return
-    # chunks that are authorized but irrelevant to the question, and the model
-    # then writes its OWN "the passages don't cover this" sentence instead of
-    # using REFUSAL_TEMPLATE. Free-form wording here is exactly the I4
-    # violation the zero-hits branch above exists to prevent, just reached a
-    # different way: a refusal whose phrasing varies is fingerprintable. Since
-    # SPEC §9 also requires every factual claim to carry a citation marker, an
-    # answer with zero RESOLVED citations (real answer or hallucinated one)
-    # is never a claim we should surface -- collapse it to the same byte-exact
-    # refusal. Token counts are still reported: unlike the zero-hits case, a
-    # Groq call really did happen here.
-    if not citations:
-        return GenerationResult(
-            answer=REFUSAL_TEMPLATE,
-            citations=[],
-            prompt_tokens=response.prompt_tokens,
-            completion_tokens=response.completion_tokens,
-            latency_ms=response.latency_ms,
-            model_used=response.model_used,
-            refused=True,
-        )
-
+    # Non-empty hits doesn't guarantee a groundable answer -- retrieval can
+    # return chunks that are authorized but irrelevant, and the model then
+    # writes its OWN "the passages don't cover this" sentence with zero
+    # resolvable citation markers. That case is NOT collapsed here: it is
+    # exactly what G7 (app.guardrails.citations / pipeline.py) exists to
+    # catch, per SPEC §4.4's "zero found -> regenerate once, then suppress".
+    # Collapsing it here too would make G7's regenerate-once step
+    # unreachable, since by the time the pipeline saw the result it would
+    # already be an unconditional refusal.
     return GenerationResult(
         answer=response.text,
         citations=citations,

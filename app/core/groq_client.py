@@ -51,6 +51,16 @@ class GroqClient:
             latency_ms=elapsed_ms,
         )
 
+    async def classify(self, model: str, messages: list[dict], *, max_tokens: int = 16) -> LLMResponse:
+        """For short, structured completions (a guard-model score, a judge's
+        numeric verdict, a YES/NO tiebreak) -- no primary/fallback swap like
+        chat() does, because these callers name the exact model they need
+        (e.g. the injection classifier), not "any good chat model". Still
+        goes through _call_model, so it gets the same semaphore + retry/
+        backoff as every other Groq call -- the free-tier RPM cap doesn't
+        care which code path made the request."""
+        return await self._call_model(model, messages, temperature=0.0, max_tokens=max_tokens)
+
     async def chat(self, messages: list[dict], *, temperature: float = 0.1, max_tokens: int = 1024) -> LLMResponse:
         try:
             return await self._call_model(self._primary, messages, temperature=temperature, max_tokens=max_tokens)

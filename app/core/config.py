@@ -30,7 +30,14 @@ class Settings(BaseSettings):
 
     # --- Guardrail thresholds (SPEC §4.4) ---
     injection_threshold: float = Field(default=0.8, alias="INJECTION_THRESHOLD")
-    out_of_scope_threshold: float = Field(default=0.25, alias="OUT_OF_SCOPE_THRESHOLD")
+    # SPEC §4.4 names 0.25 -- measured against the real corpus centroid and
+    # BAAI/bge-small-en-v1.5, that default never fires: cosine similarity to
+    # the centroid ran 0.42-0.72 across BOTH in-scope and clearly off-topic
+    # queries ("what's the weather in Pune?" scored 0.53), so 0.25 would let
+    # everything skip straight past the LLM tiebreak. Recalibrated to 0.6 --
+    # see docs/DESIGN_DECISIONS.md and PLAN.md Phase 4 task 4.3 for the
+    # measurements this is based on.
+    out_of_scope_threshold: float = Field(default=0.6, alias="OUT_OF_SCOPE_THRESHOLD")
     faithfulness_threshold: float = Field(default=0.7, alias="FAITHFULNESS_THRESHOLD")
     enable_groundedness_check: bool = Field(default=True, alias="ENABLE_GROUNDEDNESS_CHECK")
     guardrails_fail_closed: bool = Field(default=True, alias="GUARDRAILS_FAIL_CLOSED")

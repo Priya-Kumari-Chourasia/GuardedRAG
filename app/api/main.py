@@ -7,9 +7,9 @@ from qdrant_client import QdrantClient
 
 from app.api.auth import CurrentUser, get_current_user, router as auth_router
 from app.core.config import get_settings
+from app.guardrails.pipeline import run_pipeline
 from app.rag import memory
-from app.rag.generate import Citation, generate_answer
-from app.rag.retriever import retrieve
+from app.rag.generate import Citation
 
 app = FastAPI(title="PKC Secure Knowledge Assistant")
 app.include_router(auth_router)
@@ -34,6 +34,13 @@ class ChatResponse(BaseModel):
     tokens: TokenUsage
     latency_ms: int
     faithfulness_score: float | None
+    # Not in SPEC §4.5's literal field list -- extends the contract the same
+    # way conversation_id already did in Phase 3. G2/G5 are non-blocking
+    # (SPEC action: "redact ... warn inline"), so a redaction doesn't change
+    # guardrail_verdict; the UI (Phase 6) needs *some* signal to show that
+    # inline warning, and this is it.
+    input_pii_redacted: bool
+    output_pii_redacted: bool
 
 
 class ConversationMessage(BaseModel):
@@ -66,13 +73,28 @@ async def chat(body: ChatRequest, user: CurrentUser = Depends(get_current_user))
 
     # THE SECURITY BORDER, re-run on every single turn [I1]: user.roles comes
     # fresh from the just-validated JWT on THIS request, not from anything
-    # cached in the conversation. retrieve() raises ACLViolation (-> 500) via
-    # assert_acl if a filtered hit is ever somehow unauthorized -- that must
-    # never happen in a correct system, so it is deliberately NOT caught here.
-    hits = await retrieve(body.question, user.roles, request_id, user.email)
-    result = await generate_answer(body.question, hits, history=history)
+    # cached in the conversation. run_pipeline() calls retrieve() internally,
+    # which raises ACLViolation (-> 500) via assert_acl if a filtered hit is
+    # ever somehow unauthorized -- that must never happen in a correct
+    # system, so it is deliberately NOT caught here.
+    #
+    # tokens_used_today=0 is a known placeholder for G4 (budget): the
+    # request_ledger table it would read from doesn't exist until Phase 6,
+    # so G4 is wired into the pipeline's ordering now but never actually
+    # blocks yet. See app/guardrails/budget.py.
+    result = await run_pipeline(
+        question=body.question,
+        user_roles=user.roles,
+        user_email=user.email,
+        request_id=request_id,
+        history=history,
+        tokens_used_today=0,
+    )
 
-    memory.append_message(conversation_id, "user", body.question)
+    # Store the (possibly PII-redacted) question that was actually used, not
+    # necessarily the raw body.question -- conversation history must never
+    # persist PII that G2 already decided shouldn't reach the LLM.
+    memory.append_message(conversation_id, "user", result.question_used)
     memory.append_message(conversation_id, "assistant", result.answer)
 
     latency_ms = int((time.monotonic() - start) * 1000)
@@ -80,21 +102,14 @@ async def chat(body: ChatRequest, user: CurrentUser = Depends(get_current_user))
     return ChatResponse(
         answer=result.answer,
         citations=result.citations,
-        # No guardrail pipeline exists yet (Phase 4) -- "allowed" here means
-        # "not blocked by a guardrail", which is trivially true when there are
-        # none. It is NOT the same thing as an ACL refusal: a REFUSAL_TEMPLATE
-        # answer from an empty retrieval still reports "allowed", because the
-        # security border that fired is retrieval-time authorization, not a
-        # guardrail verdict. Phase 4 will make this field mean something.
-        guardrail_verdict="allowed",
+        guardrail_verdict=result.verdict.value,
         request_id=request_id,
         conversation_id=conversation_id,
         tokens=TokenUsage(prompt=result.prompt_tokens, completion=result.completion_tokens),
         latency_ms=latency_ms,
-        # Groundedness checking (G6) is a Phase 4 guardrail, feature-flagged
-        # off by default at the pipeline level -- None here just means
-        # "not measured yet", not "ungrounded".
-        faithfulness_score=None,
+        faithfulness_score=result.faithfulness_score,
+        input_pii_redacted=result.input_pii_redacted,
+        output_pii_redacted=result.output_pii_redacted,
     )
 
 
