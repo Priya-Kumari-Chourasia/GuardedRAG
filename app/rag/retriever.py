@@ -2,21 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fastembed import TextEmbedding
 from qdrant_client import QdrantClient
 
 from app.core.config import get_settings
+from app.rag.embeddings import get_dense_model
 from app.rbac.acl import build_acl_filter
 from app.rbac.enforce import assert_acl
-
-_dense_model: TextEmbedding | None = None
-
-
-def _get_dense_model() -> TextEmbedding:
-    global _dense_model
-    if _dense_model is None:
-        _dense_model = TextEmbedding(model_name=get_settings().embed_model)
-    return _dense_model
 
 
 @dataclass
@@ -50,7 +41,7 @@ async def retrieve(
     acl_filter = build_acl_filter(user_roles)
 
     client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
-    query_vector = list(_get_dense_model().embed([query]))[0]
+    query_vector = list(get_dense_model().embed([query]))[0]
 
     results = client.query_points(
         collection_name=settings.qdrant_collection,

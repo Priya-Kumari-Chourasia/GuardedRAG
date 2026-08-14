@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import uuid
 from pathlib import Path
 
+import numpy as np
 import yaml
 from fastembed import TextEmbedding
 from qdrant_client import QdrantClient, models
@@ -13,6 +15,7 @@ from app.core.config import get_settings
 from app.rbac.acl import acl_for, most_restrictive
 
 RAW_ROOT = Path("data/raw")
+CENTROID_PATH = Path("data/corpus_centroid.json")
 
 CHUNK_TARGET_TOKENS = 512
 CHUNK_OVERLAP_TOKENS = 64
@@ -158,6 +161,17 @@ def embed_and_upsert(chunks: list[dict]) -> None:
     # peak memory per ONNX forward pass low -- default batch_size=256 exhausted
     # this machine's page file.
     vectors = list(embedder.embed(texts, batch_size=8, parallel=None))
+
+    # G3 (out-of-scope guardrail) needs a fixed point to measure "how close is
+    # this query to what PKC's corpus is actually about". Computing that mean
+    # here -- once, at ingest -- instead of at query time means G3 never pays
+    # for a full-collection scan; it just loads this small cached vector.
+    # Normalized so a later cosine-similarity dot product is a plain dot
+    # product, not a full cosine formula, at query time.
+    centroid = np.mean(np.array(vectors), axis=0)
+    centroid = centroid / np.linalg.norm(centroid)
+    CENTROID_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CENTROID_PATH.write_text(json.dumps(centroid.tolist()))
 
     points = [
         models.PointStruct(
