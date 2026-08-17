@@ -83,6 +83,19 @@ def format_comment(report: dict) -> str:
 
 def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("evals/results/latest.json")
+    if not path.exists():
+        # The eval suite never ran -- e.g. `pytest tests/` failed first (the CI
+        # workflow's steps after it still fire via `if: always()` so the PR gets
+        # a comment either way). Report that plainly instead of crashing here:
+        # an uncaught exception left `pr_comment.md` empty, which made the next
+        # step's `gh pr comment --body-file` call fail with GraphQL's
+        # "Body cannot be blank" -- a second, confusing failure on top of the
+        # real one. Found via the PLAN.md 5.7 broken-ACL-filter verify PR.
+        print("## Eval results -- SPEC_1.md Sec 7 CI gate\n\n"
+              "**Overall: FAIL** -- the eval suite never ran because an earlier "
+              "step (`pytest tests/`) failed first. See that step's log for the "
+              "real failure.")
+        return
     report = json.loads(path.read_text(encoding="utf-8"))
     print(format_comment(report))
 
