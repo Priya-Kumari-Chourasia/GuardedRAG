@@ -452,6 +452,30 @@ don't need re-running, `compare_to_baseline` only reads the `quality` sub-object
 `security` (`leak_rate=0.0`, real) and `adversarial` (`injection_block_rate=1.0`, real) ARE
 trustworthy in this baseline.
 
+**5.6 CI status as of 2026-08-17: confirmed working end-to-end against a real GitHub
+remote** (`github.com/Priya-Kumari-Chourasia/GuardedRAG`). Took 5 real fix cycles to get
+there, each a genuine bug this local-only venv had never surfaced -- worth keeping as a
+record of what "CI actually running" catches that local dev doesn't:
+1. `requirements.txt` pinned `groq==0.15.0`, incompatible with `langchain-groq==0.3.7`'s
+   `groq<1,>=0.30.0` -- invisible locally because the venv had already silently drifted to
+   0.37.1 when langchain-groq was installed (pip doesn't re-resolve an already-satisfied
+   package). Fixed: bumped the pin to match what had actually been tested.
+2. The "Run test suite" step used bare `pytest`, not `python -m pytest` -- every local run
+   here used `-m`, which inserts the repo root onto `sys.path`; bare `pytest` doesn't, so a
+   truly fresh checkout got `ModuleNotFoundError: No module named 'app'` on all 10 test
+   files. Fixed the workflow step.
+3. `tests/test_guardrail_pipeline.py::test_pipeline_redacts_input_pii_and_still_answers`
+   asked about Diwali office closure -- a doc not in the 25-doc CI fixture (only the full
+   100-doc local corpus has it). Passed locally, failed in CI. The golden eval suites were
+   already rigorously fixture-scoped (`_scope_to_fixture`); the hand-written `tests/` files
+   never got the same check. Reworded to ask about `co-roadmap-h1-2026` (in the fixture);
+   verified against both the full local corpus and the exact fixture-scoped collection CI
+   uses before pushing.
+After all three fixes: install, Qdrant, ingest, and the full 93-test suite all pass in CI.
+The run still shows **failure** -- correctly -- at the final gate-check step, because of
+finding 2 above (`false_refusal_rate=0.875`, real and still open). That's CI doing its job:
+catching a genuine problem, not a false alarm from the CI setup itself.
+
 **Verify (the important one):** open a deliberately-broken PR that removes the ACL filter and
 **watch CI fail**. Screenshot it. A red CI run catching a real security regression is more
 persuasive than a green one.
