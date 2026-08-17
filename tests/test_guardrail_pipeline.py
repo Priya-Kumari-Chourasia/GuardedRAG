@@ -34,9 +34,17 @@ def test_pipeline_redacts_input_pii_and_still_answers():
     # NO citation marker at all -- correct G7 behavior (regenerate once, then
     # suppress), but it meant this test was accidentally exercising G7's
     # suppression path instead of the G2 redaction path it's meant to isolate.
+    #
+    # Asks about co-roadmap-h1-2026 (product roadmap), not the holiday
+    # calendar/office-closure docs -- CI (PLAN.md 5.6) only ingests the 25-doc
+    # fixture (data/golden/fixture_docs.txt), which includes the roadmap doc
+    # but not either holiday doc. This test isn't about ACL/fixture scope at
+    # all, so it should run against whatever doc the current corpus actually
+    # has, not one that only exists in a full local 100-doc ingest.
     result = asyncio.run(
         run_pipeline(
-            question="My name is Rohan Mehta and my PAN is ABCDE1234F -- when is the office closed for Diwali in 2026?",
+            question="My name is Rohan Mehta and my PAN is ABCDE1234F -- what are PKC's three "
+            "strategic pillars for the H1 2026 product roadmap?",
             user_roles=[Role.EMPLOYEE.value],
             user_email="test-g2@pkc.com",
             request_id="test-g2",
