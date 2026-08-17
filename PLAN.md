@@ -425,10 +425,25 @@ collection (not the dev collection holding the full corpus) before running
    applied 2026-08-17 (zero Groq cost, pure code change):** `PipelineResult` now carries a
    `block_reason: str | None` field, and `_refused()` accepts `block_reason=` + `hits=` so
    G5/G6/G7 blocks each record which stage fired and (for G6) the actual groundedness
-   score, instead of all three being indistinguishable behind one REFUSAL_TEMPLATE. Next
-   step: re-run just SEC-038/039/040/041/042/044/045 (7 cases, cheap) once there's a small
-   quota window, and the cached `CaseRun.block_reason` will say definitively whether it's
-   G6 or G7 and why.
+   score, instead of all three being indistinguishable behind one REFUSAL_TEMPLATE.
+
+   **In progress, paused 2026-08-17 (quota exhausted mid-run):** re-ran SEC-037 (control)
+   and SEC-038 with `block_reason` instrumentation active. SEC-037 confirmed clean
+   (`verdict=allowed`, `block_reason=None`, real citation) -- consistent with the earlier
+   baseline, not a fluke. SEC-038 itself hit `groq.RateLimitError` before producing a
+   result (~45 min cooldown at time of pause); SEC-039/040/041/042/044/045 not yet
+   attempted this round. Also hit a SEPARATE, unrelated local-machine issue along the way:
+   G2's Presidio/spacy `AnalyzerEngine` (cached singleton, `app/guardrails/pii.py`'s
+   `_get_analyzer()`) threw `MemoryError` on its one-time model load when system free RAM
+   was ~1.8-2GB (VS Code + Chrome eating the rest) -- NOT a Groq issue, and it got cached
+   as a "successful" `blocked_pii`/`G2_input_pii_exception` result (pipeline correctly
+   fails closed on exceptions, so `_run_one` doesn't raise) which would have masqueraded
+   as real data. Caught by checking `block_reason` before trusting the number; cleared
+   from `run_cache.json` both times it happened. **Resume:** re-run
+   `evals/run_evals.py --suite security --fixture-docs data/golden/fixture_docs.txt
+   --case-ids <file with SEC-038 through SEC-045>` once quota allows -- if a case's
+   result shows `block_reason` starting with `G2_`, that's a memory artifact, not a
+   real answer; delete it from `run_cache.json` and re-run rather than trusting it.
 
 Prior infra work (still true, not re-explained here): `evals/run_evals.py` is resilient
 (per-case error isolation, resumable `run_cache.json`), the NaN-judge-caching bug is fixed,
