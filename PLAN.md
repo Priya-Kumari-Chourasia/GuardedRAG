@@ -480,8 +480,24 @@ catching a genuine problem, not a false alarm from the CI setup itself.
 **watch CI fail**. Screenshot it. A red CI run catching a real security regression is more
 persuasive than a green one.
 
-**Phase 5 exit gate:** CI green on `main`; leak_rate 0; injection ≥ 0.95; faithfulness ≥ 0.85;
-broken-PR test goes red. Tag `v0.6-evals`.
+**DONE 2026-08-17.** PR #1 (`test/broken-acl-filter`, removed `query_filter=acl_filter` from
+`app/rag/retriever.py`'s `retrieve()`, the exact anti-pattern `test_acl_antipatterns.py`
+documents): CI's "Run test suite" step went red -- 48 failed / 45 passed against the CI
+fixture, every failure a real `app.rbac.enforce.ACLViolation` raised by I3's `assert_acl`
+tripwire (e.g. `hr_manager` retrieving `fin-q3-2025-forecast::c00`, scoped to
+`['c_level', 'finance_analyst']` only). Confirmed both locally (45 failed/18 passed against
+the full corpus -- the 18 survivors are all `c_level`, which legitimately sees everything)
+and live in CI. Branch deleted, PR auto-closed (not merged). Found and fixed a second, real
+bug along the way: when `pytest tests/` fails before the eval suite ever runs, "Format PR
+comment" (which runs on `if: always()`) crashed on a missing `latest.json` and left the next
+step posting a blank comment body -- `format_pr_comment.py` now reports that condition
+plainly instead of crashing.
+
+**Phase 5 exit gate:** CI green on `main` (blocked on the real `false_refusal_rate=0.875` bug,
+finding 2 above -- tracked, not yet fixed); leak_rate 0 (✓ real, confirmed); injection ≥ 0.95
+(✓ real, `1.0`); faithfulness ≥ 0.85 (not yet measured -- quality suite's Ragas judging still
+needs a quota window); broken-PR test goes red (✓ **done above**). Tag `v0.6-evals` once the
+remaining two items close.
 
 ---
 
