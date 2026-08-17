@@ -98,8 +98,14 @@ jobs:
       # SPEC's required security tests (CLAUDE.md layout: "test_acl_matrix.py ·
       # test_acl_antipatterns.py (required)") plus every other unit/guardrail
       # test -- all run against this same fixture-backed Qdrant instance.
+      # `python -m pytest` (NOT bare `pytest`) -- -m inserts the repo root onto
+      # sys.path, which is how `from app...` imports resolve locally too (no
+      # conftest.py/pyproject pythonpath config does this another way). Bare
+      # `pytest` skipped that insertion on a fresh checkout: ModuleNotFoundError
+      # 'app' on all 10 test files, first caught in CI, never locally, because
+      # every local run here already used `python -m pytest`.
       - name: Run test suite
-        run: pytest tests/ -v
+        run: python -m pytest tests/ -v
 
       - name: Run eval suites against fixture
         id: run_evals
