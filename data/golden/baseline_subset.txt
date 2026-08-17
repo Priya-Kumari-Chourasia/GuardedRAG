@@ -1,0 +1,31 @@
+# scripts/select_baseline_subset.py output -- PLAN.md 5.7 quota-constrained baseline
+# One line per case: <suite>:<case_id>
+quality:Q-051
+quality:Q-049
+quality:Q-050
+quality:Q-014
+quality:Q-001
+quality:Q-002
+quality:Q-006
+quality:Q-008
+security:SEC-036
+security:SEC-037
+security:SEC-038
+security:SEC-039
+security:SEC-040
+security:SEC-041
+security:SEC-042
+security:SEC-044
+security:SEC-045
+security:SEC-001
+security:SEC-002
+security:SEC-003
+security:SEC-004
+security:SEC-005
+adversarial:ADV-027
+adversarial:ADV-028
+adversarial:ADV-022
+adversarial:ADV-001
+adversarial:ADV-012
+adversarial:ADV-017
+adversarial:ADV-007

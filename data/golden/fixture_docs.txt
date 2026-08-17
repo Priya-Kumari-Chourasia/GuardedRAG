@@ -1,0 +1,57 @@
+# PLAN.md task 5.5 / SPEC_1.md Sec 7.4 -- 25-doc CI fixture corpus.
+#
+# Chosen by scripts/select_fixture_docs.py: a greedy pure case-coverage-maximizing
+# selection put 25/25 slots into company-wide docs (cheap 1-doc quality cases) and
+# scored 41/90 doc-dependent golden cases, but tested almost no ACL boundaries --
+# useless for a *security* CI gate. This list is a manually curated set instead:
+# ~4-5 docs per department (all 6 roles represented, both overlap classes present),
+# plus all 5 SPEC Sec 8 deliberate cases, scoring 39/90 doc-dependent cases
+# (30/80 quality, 9/10 security overlap-positive) while actually exercising
+# cross-role and overlap ACL logic. Security refusal cases (35) and all
+# adversarial cases (30) remain fully valid regardless of which docs are
+# ingested -- I4's zero-hits refusal is byte-identical to an ACL refusal, so a
+# cited doc's absence from the fixture can never manufacture a false leak.
+#
+# Five deliberate cases (SPEC Sec 8), all present below:
+#   1. cross-reference:        fin-vendor-aws, eng-cloud-costs-q3-2025
+#   2. conflicting versions:   fin-q3-2025-forecast, fin-q3-2025-report
+#   3. synthetic PII:          hr-emp-record-arjun, hr-payroll-2025-08, hr-perf-review-neha
+#   4. poisoned document:      eng-postmortem-embedding-latency
+#   5. near-duplicate pair:    co-allhands-2025-09 (public), exec-board-deck-sep-special (restricted)
+
+# company_wide (4)
+co-allhands-2025-09
+co-handbook-2026
+co-org-chart-q3-2025
+co-roadmap-h1-2026
+
+# hr (4)
+hr-emp-record-arjun
+hr-payroll-2025-08
+hr-perf-review-neha
+hr-comp-bands-eng
+
+# finance (5)
+fin-q3-2025-forecast
+fin-q3-2025-report
+fin-vendor-aws
+fin-q4-2025-report
+fin-budget-2025
+
+# sales_marketing (4)
+sales-marketing-spend-q3-2025
+sales-digital-ad-spend-q3-2025
+sales-pipeline-q3-2025
+sales-gtm-strategy-2026
+
+# engineering (5)
+eng-cloud-costs-q3-2025
+eng-postmortem-embedding-latency
+eng-cloud-costs-aws-breakdown-sep
+eng-cloud-costs-optimization-q4
+eng-architecture-authz
+
+# executive (3)
+exec-board-deck-sep-special
+exec-board-deck-q3-2025
+exec-strategy-2026-priorities

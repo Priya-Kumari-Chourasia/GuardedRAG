@@ -149,7 +149,7 @@ def process_document(path: Path, department: str) -> list[dict]:
     return records
 
 
-def embed_and_upsert(chunks: list[dict]) -> None:
+def embed_and_upsert(chunks: list[dict], *, update_centroid: bool = True) -> None:
     settings = get_settings()
     client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
     embedder = TextEmbedding(model_name=settings.embed_model)
@@ -168,10 +168,18 @@ def embed_and_upsert(chunks: list[dict]) -> None:
     # for a full-collection scan; it just loads this small cached vector.
     # Normalized so a later cosine-similarity dot product is a plain dot
     # product, not a full cosine formula, at query time.
-    centroid = np.mean(np.array(vectors), axis=0)
-    centroid = centroid / np.linalg.norm(centroid)
-    CENTROID_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CENTROID_PATH.write_text(json.dumps(centroid.tolist()))
+    #
+    # update_centroid=False for a partial/fixture ingest (evals/CI): this file
+    # is shared, unconditional-write, full-corpus state, not per-collection --
+    # a 25-doc fixture ingest overwriting it with a 25-doc centroid would
+    # quietly degrade the real app's G3 detection. Learned this the hard way:
+    # a baseline-run fixture ingest into a scratch Qdrant collection clobbered
+    # this file even though it never touched the real collection.
+    if update_centroid:
+        centroid = np.mean(np.array(vectors), axis=0)
+        centroid = centroid / np.linalg.norm(centroid)
+        CENTROID_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CENTROID_PATH.write_text(json.dumps(centroid.tolist()))
 
     points = [
         models.PointStruct(
@@ -190,14 +198,28 @@ def embed_and_upsert(chunks: list[dict]) -> None:
         client.upsert(collection_name=settings.qdrant_collection, points=points[i : i + batch_size])
 
 
-def ingest_all() -> None:
+def ingest_all(doc_ids: set[str] | None = None) -> None:
+    """doc_ids=None ingests the full 100-doc corpus (normal/local use). Passing
+    a set restricts ingestion to those doc_ids -- used for the CI fixture corpus
+    (PLAN.md task 5.5/5.6, SPEC_1.md Sec 7.4: ~5 min PR-gate budget, not the
+    full 100 docs). Filtered by filename stem, not by opening+parsing every
+    file's frontmatter, since every raw doc is named exactly f"{doc_id}.md"
+    (scripts/corpus_manifest.py's convention)."""
     all_chunks: list[dict] = []
+    n_docs = 0
     for dept_dir in sorted(p for p in RAW_ROOT.iterdir() if p.is_dir()):
         for doc_path in sorted(dept_dir.glob("*.md")):
+            if doc_ids is not None and doc_path.stem not in doc_ids:
+                continue
             all_chunks.extend(process_document(doc_path, dept_dir.name))
+            n_docs += 1
 
-    print(f"Parsed {len(all_chunks)} chunks from {sum(1 for _ in RAW_ROOT.rglob('*.md'))} documents.")
-    embed_and_upsert(all_chunks)
+    if doc_ids is not None and n_docs != len(doc_ids):
+        missing = doc_ids - {c["doc_id"] for c in all_chunks}
+        raise ValueError(f"fixture doc_ids not found under {RAW_ROOT}: {sorted(missing)}")
+
+    print(f"Parsed {len(all_chunks)} chunks from {n_docs} documents.")
+    embed_and_upsert(all_chunks, update_centroid=doc_ids is None)
     print(f"Upserted {len(all_chunks)} chunks into '{get_settings().qdrant_collection}'.")
 
 
