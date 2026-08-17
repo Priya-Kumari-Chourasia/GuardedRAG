@@ -1,0 +1,578 @@
+# data/golden/quality.yaml
+# Quality eval set (SPEC_1.md Sec 7.1) -- 80 per-role Q&A pairs against the real corpus.
+#
+# Schema:
+#   id           - Q-NNN
+#   user         - seeded user's email; this IS their role (see scripts/seed_users.py) --
+#                  the harness looks up roles from this, never hardcode a role field here
+#   question     - natural question the user would actually ask
+#   ground_truth - reference answer, factually grounded in the cited doc(s). Used by Ragas
+#                  context_recall/answer comparison.
+#   must_cite    - list of doc_ids the answer should draw from (grounding/precision check)
+#   category     - "standard" | "cross_ref" | "conflicting_versions" | "near_dup" | "multi_doc"
+#
+# Every fact below is taken from the actual corpus text in data/raw/**/*.md -- none invented.
+# Overlap-role coverage: cloud_costs asked by both finance_analyst (arjun) and
+# engineering_lead (karan); marketing_spend asked by both finance_analyst (arjun) and
+# sales_lead (divya) -- proves precise, non-hierarchical authorization on the quality side,
+# mirroring security.yaml's overlap positives.
+
+- id: Q-001
+  user: ravi@pkc.com
+  question: "What is PKC's FY 2025 revenue and what is the FY 2026 target mentioned in the employee handbook?"
+  ground_truth: "FY 2025 revenue was ₹850 crore and PKC is targeting ₹950 crore for FY 2026."
+  must_cite: ["co-handbook-2026"]
+  category: standard
+
+- id: Q-002
+  user: ravi@pkc.com
+  question: "How long is the probation period at PKC and when are performance reviews conducted during it?"
+  ground_truth: "Probation lasts 6 months, with a performance review at month 3 and another at month 6."
+  must_cite: ["co-handbook-2026"]
+  category: standard
+
+- id: Q-003
+  user: ravi@pkc.com
+  question: "How many total statutory holidays does PKC observe in India per the 2026 holiday calendar?"
+  ground_truth: "16 days of statutory holidays in India, plus 2 additional Bengaluru observances (Karnataka Rajyotsava and Bengaluru Tech Fest) and 2 floating holidays per employee."
+  must_cite: ["co-holiday-calendar-2026"]
+  category: standard
+
+- id: Q-004
+  user: ravi@pkc.com
+  question: "What firewall hardware and encryption does PKC use for its Bengaluru-Austin site-to-site VPN?"
+  ground_truth: "PKC uses Cisco ASA 5506-X firewalls with IPSec tunnels, AES-256 encryption and SHA-256 integrity, managed centrally via the PKC Network Operations Centre."
+  must_cite: ["co-it-howto-vpn"]
+  category: standard
+
+- id: Q-005
+  user: ravi@pkc.com
+  question: "What are the minimum password requirements after a password reset at PKC?"
+  ground_truth: "Minimum 12 characters, with at least 1 uppercase letter, 1 lowercase letter, 1 digit, and 1 special character; no reuse of the last 5 passwords; and it must not contain the employee's name or employee ID."
+  must_cite: ["co-it-howto-password"]
+  category: standard
+
+- id: Q-006
+  user: ravi@pkc.com
+  question: "Who is PKC's CEO and which executives report directly to them?"
+  ground_truth: "Ananya Rao is the CEO. The COO (Rohan Mehta), CTO (Dr. Kavita Iyer), CFO (Sameer Patel), and CMO (Priyanka Singh) report directly to her."
+  must_cite: ["co-org-chart-q3-2025"]
+  category: standard
+
+- id: Q-007
+  user: ravi@pkc.com
+  question: "What revenue target did the board set for FY 2026 according to the June 2025 all-hands notes?"
+  ground_truth: "The board set a ₹55 crore FY 2026 revenue goal, representing roughly a 30% YoY increase."
+  must_cite: ["co-allhands-2025-06"]
+  category: standard
+
+- id: Q-008
+  user: ravi@pkc.com
+  question: "What are the three strategic pillars of PKC's H1 2026 product roadmap?"
+  ground_truth: "Intelligent Process Automation (IPA) 2.0, Conversational AI Suite, and Edge-AI for IoT."
+  must_cite: ["co-roadmap-h1-2026"]
+  category: standard
+
+- id: Q-009
+  user: ravi@pkc.com
+  question: "What is the per-day meal reimbursement limit under PKC's expense policy?"
+  ground_truth: "₹2,500 per day (including GST), covering breakfast, lunch, dinner, and incidental items."
+  must_cite: ["co-expense-policy"]
+  category: standard
+
+- id: Q-010
+  user: ravi@pkc.com
+  question: "What is the monthly home-office stipend under PKC's Remote Work Policy Addendum?"
+  ground_truth: "₹5,000 per month (taxable), intended to cover internet, electricity, and ergonomic accessories."
+  must_cite: ["co-remote-work-addendum"]
+  category: standard
+
+- id: Q-011
+  user: karan@pkc.com
+  question: "What is the individual workstation budget limit when requesting new equipment, and what is the annual departmental cap?"
+  ground_truth: "An individual workstation request is capped at ₹1.5 L, with an annual departmental cap of ₹30 L."
+  must_cite: ["co-it-howto-equipment"]
+  category: standard
+
+- id: Q-012
+  user: divya@pkc.com
+  question: "When does PKC's Diwali 2025 office closure begin and end?"
+  ground_truth: "Operations pause from 00:01 hrs on 25 Oct 2025 (Diwali) and resume at 09:00 hrs on 28 Oct 2025, covering Diwali, Govardhan Puja, and Bhai Dooj."
+  must_cite: ["co-office-closure-diwali"]
+  category: standard
+
+- id: Q-013
+  user: meera@pkc.com
+  question: "What FY25-26 revenue guidance and net-new ARR did the H2 2025 product roadmap project?"
+  ground_truth: "The roadmap aligned with FY25-26 revenue guidance of ₹1,240 crore and projected net-new ARR of ₹210 crore from upcoming releases."
+  must_cite: ["co-roadmap-h2-2025"]
+  category: standard
+
+- id: Q-014
+  user: ravi@pkc.com
+  question: "What did the September 2025 all-hands strategic announcement say about the average employee compensation package going forward?"
+  ground_truth: "The average total compensation package will rise to approximately ₹12 L per annum, reflecting market competitiveness and PKC's commitment to rewarding talent."
+  must_cite: ["co-allhands-2025-09"]
+  category: near_dup
+
+- id: Q-015
+  user: neha@pkc.com
+  question: "What is the salary band range for a Senior Engineer (E3) in PKC's engineering compensation bands?"
+  ground_truth: "Band E3 (Senior Engineer, 5-9 years experience) has a base salary of ₹14.0 L - ₹20.0 L with 12% variable pay, for a total compensation of ₹15.7 L - ₹22.4 L."
+  must_cite: ["hr-comp-bands-eng"]
+  category: standard
+
+- id: Q-016
+  user: neha@pkc.com
+  question: "What is the OTE for a Sales Manager (B1 band) at PKC?"
+  ground_truth: "Band B1 (Sales Manager) has an OTE of ₹15.1 L - ₹18.9 L, built from a base of ₹10.8 L - ₹13.5 L plus a 40% variable pay target."
+  must_cite: ["hr-comp-bands-sales"]
+  category: standard
+
+- id: Q-017
+  user: neha@pkc.com
+  question: "What is the total CTC range for the A4 corporate-function compensation band?"
+  ground_truth: "Band A4 (Head of Finance, Senior Legal Partner, Director - HR & Culture) has a total CTC range of ₹25.3 L - ₹32.8 L, including 15% variable pay."
+  must_cite: ["hr-comp-bands-corp"]
+  category: standard
+
+- id: Q-018
+  user: neha@pkc.com
+  question: "What is Ravi Kumar's total gross compensation for FY 2025-26 and what was his most recent performance rating?"
+  ground_truth: "Ravi Kumar's total gross compensation for FY 2025-26 is approximately ₹26.5 L, and his FY 2024-25 performance rating was 4.7/5 (Exceeds Expectations)."
+  must_cite: ["hr-emp-record-ravi"]
+  category: standard
+
+- id: Q-019
+  user: neha@pkc.com
+  question: "What was PKC's total gross payroll spend in August 2025, and what drove the increase over July?"
+  ground_truth: "August 2025 gross payroll was ₹4.87 crore, a 3.2% increase over July 2025, driven by two new senior hires and a statutory 4% cost-of-living adjustment applied to all staff."
+  must_cite: ["hr-payroll-2025-08"]
+  category: standard
+
+- id: Q-020
+  user: neha@pkc.com
+  question: "What was PKC's combined Q3 2025 gross payroll across Bengaluru and Austin, and what was the total TDS payable?"
+  ground_truth: "Combined Q3 2025 gross payroll was ₹153.12 crore (Bengaluru ₹148.8 crore plus Austin ₹4.32 crore), with total TDS payable of ₹22.5 L for the quarter."
+  must_cite: ["hr-payroll-tax-q3-2025"]
+  category: standard
+
+- id: Q-021
+  user: neha@pkc.com
+  question: "What was Karan Malhotra's Q2 2025 performance rating, and what promotion was recommended?"
+  ground_truth: "Karan Malhotra received an Exceeds Expectations rating of 4.5/5 for Q2 2025 and was recommended for promotion to Lead Engineer - AI Platform effective 1 October 2025."
+  must_cite: ["hr-perf-review-karan"]
+  category: standard
+
+- id: Q-022
+  user: neha@pkc.com
+  question: "How did Neha Gupta's Q2 2025 hiring numbers compare to her target, and what was her offer acceptance rate?"
+  ground_truth: "Neha Gupta achieved 48 total hires against a target of 38 in Q2 2025 (26% over target), with a 92% offer acceptance rate versus a department average of 78%."
+  must_cite: ["hr-perf-review-neha"]
+  category: standard
+
+- id: Q-023
+  user: neha@pkc.com
+  question: "What is the target total annual CTC range for the Senior Backend Engineer role PKC is hiring for?"
+  ground_truth: "The role offers ₹22.5 L - ₹27.0 L annual CTC depending on experience, plus up to 15% variable pay and 0.05%-0.10% ESOP vesting over 4 years."
+  must_cite: ["hr-hiring-backend-eng"]
+  category: standard
+
+- id: Q-024
+  user: neha@pkc.com
+  question: "What is the total cost to company for the Finance Analyst role PKC is currently hiring for?"
+  ground_truth: "The role's total cost to company is approximately ₹15.7 L, comprising a ₹12.5 L base salary, up to ₹1.9 L performance bonus, stock options, and allowances."
+  must_cite: ["hr-hiring-finance-analyst"]
+  category: standard
+
+- id: Q-025
+  user: neha@pkc.com
+  question: "How many SDRs is PKC hiring and by when, and what is the total CTC for the senior versus junior role?"
+  ground_truth: "PKC is hiring 2 SDRs (1 senior, 1 junior) with a target onboarding date of 15 September 2026; the Senior SDR total CTC is ₹14.0 L and the Junior SDR is ₹9.0 L."
+  must_cite: ["hr-hiring-sdr"]
+  category: standard
+
+- id: Q-026
+  user: meera@pkc.com
+  question: "What was Arjun Rao's total gross compensation, and what major project did he lead in FY 2023-24?"
+  ground_truth: "Arjun Rao's total gross compensation was ₹32.3 L per annum. He led Project Athena, a conversational AI chatbot for a major banking client, reducing average query resolution time by 38%."
+  must_cite: ["hr-emp-record-arjun"]
+  category: standard
+
+- id: Q-027
+  user: arjun@pkc.com
+  question: "What was PKC's net profit and profit margin for Q1 2025?"
+  ground_truth: "Net profit was ₹3.2 crore for Q1 2025, a profit margin of 17.1%, up from 15.4% in Q1 2024."
+  must_cite: ["fin-q1-2025-report"]
+  category: standard
+
+- id: Q-028
+  user: arjun@pkc.com
+  question: "What was PKC's Q2 2025 revenue, and which two major deals contributed to it?"
+  ground_truth: "Q2 2025 revenue grew 28% YoY to ₹184.6 crore, driven by a 3-year ₹9.4 crore contract with Mahindra & Mahindra and a strategic partnership with Texas Instruments for edge-AI deployment in Austin."
+  must_cite: ["fin-q2-2025-report"]
+  category: standard
+
+- id: Q-029
+  user: arjun@pkc.com
+  question: "What revenue did PKC report for Q4 2025, and what is the FY 2026 revenue target?"
+  ground_truth: "Q4 2025 revenue was ₹12.6 crore, and the FY 2026 target is ₹55 crore, a projected 22% YoY increase."
+  must_cite: ["fin-q4-2025-report"]
+  category: standard
+
+- id: Q-030
+  user: arjun@pkc.com
+  question: "What was PKC's total FY 2024 revenue and net profit after tax?"
+  ground_truth: "FY 2024 revenue was ₹1,842.5 crore, with net profit after tax of ₹212.7 crore, reflecting a 9.1% margin expansion."
+  must_cite: ["fin-annual-summary-2024"]
+  category: standard
+
+- id: Q-031
+  user: arjun@pkc.com
+  question: "What is PKC's FY2025 total operating expense budget, and what EBITDA does it deliver?"
+  ground_truth: "The FY2025 operating expense base is ₹1,527.3 crore against projected revenue of ₹1,842.6 crore, delivering an expected EBITDA of ₹315.3 crore."
+  must_cite: ["fin-budget-2025"]
+  category: standard
+
+- id: Q-032
+  user: arjun@pkc.com
+  question: "What total revenue and net profit after tax does the FY2026 draft budget project?"
+  ground_truth: "The FY2026 draft budget projects total revenue of ₹1,245 crore and net profit after tax of ₹212 crore."
+  must_cite: ["fin-budget-2026-draft"]
+  category: standard
+
+- id: Q-033
+  user: arjun@pkc.com
+  question: "What is the total FY2025 Engineering department budget, and how much of it is CapEx?"
+  ground_truth: "The Engineering Department FY2025 budget totals ₹12.8 crore, with ₹3.65 crore allocated to CapEx covering the server/GPU farm, edge computing nodes, AI lab renovation, and software licenses."
+  must_cite: ["fin-budget-eng-2025"]
+  category: standard
+
+- id: Q-034
+  user: arjun@pkc.com
+  question: "What is the total annual license fee under PKC's Salesforce contract, and how is it split across payment installments?"
+  ground_truth: "The total annual license fee is ₹5.65 crore, paid in two installments: ₹2.83 crore due on 26 Jan 2027 and ₹2.82 crore due on 15 Nov 2027."
+  must_cite: ["fin-vendor-salesforce"]
+  category: standard
+
+- id: Q-035
+  user: arjun@pkc.com
+  question: "What was the total amount payable on PKC's September 2025 AWS invoice?"
+  ground_truth: "Total payable was ₹21.36 L, comprising an ₹18.10 L subtotal plus ₹3.26 L GST at 18%."
+  must_cite: ["fin-invoice-aws-sep"]
+  category: standard
+
+- id: Q-036
+  user: arjun@pkc.com
+  question: "What legal services did LegalEdge Associates bill PKC for in July 2025, and what was the total payable?"
+  ground_truth: "Services included drafting AI-suite software licensing agreements, advisory on the Personal Data Protection Bill, IP Tribunal representation, and an annual legal retainer; total payable was ₹72.45 L including GST."
+  must_cite: ["fin-invoice-legal-aug"]
+  category: standard
+
+- id: Q-037
+  user: arjun@pkc.com
+  question: "What was PKC's Q3 2025 AWS spend, and how did it compare to Q2 2025?"
+  ground_truth: "Q3 2025 AWS spend was ₹18.4 L, a 12% increase over Q2 2025's ₹16.4 L, driven mainly by the PKC-Recommend service launch."
+  must_cite: ["eng-cloud-costs-q3-2025"]
+  category: standard
+
+- id: Q-038
+  user: arjun@pkc.com
+  question: "Which AWS service accounted for the largest share of September 2025 cloud spend, and how much was it?"
+  ground_truth: "EC2 (On-Demand + Spot) accounted for the largest share at ₹1.12 crore, or 39.4% of the ₹2.84 crore total September 2025 spend."
+  must_cite: ["eng-cloud-costs-aws-breakdown-sep"]
+  category: standard
+
+- id: Q-039
+  user: arjun@pkc.com
+  question: "How much cloud cost savings does the Q4 2025 optimization plan target, and from what projected spend?"
+  ground_truth: "The plan targets a 22% reduction, about ₹83 L, from a projected Q4 2025 cloud spend of ₹3.78 crore across AWS, Azure, and GCP."
+  must_cite: ["eng-cloud-costs-optimization-q4"]
+  category: standard
+
+- id: Q-040
+  user: karan@pkc.com
+  question: "What drove the increase in Q3 2025 AWS compute spend, and what was the cost-per-transaction improvement?"
+  ground_truth: "The PKC-Recommend service launch drove a 28% rise in EC2 compute hours across the Bengaluru region; cost-per-transaction improved from ₹0.42 to ₹0.38."
+  must_cite: ["eng-cloud-costs-q3-2025"]
+  category: standard
+
+- id: Q-041
+  user: karan@pkc.com
+  question: "What caused the month-on-month AWS spend increase in September 2025?"
+  ground_truth: "September 2025 AWS spend rose 8.8% to ₹2.84 crore, driven by a post-Ganesh Chaturthi data migration to the us-west-2 region and an EC2 training spike for the upcoming PKC-Vision product launch."
+  must_cite: ["eng-cloud-costs-aws-breakdown-sep"]
+  category: standard
+
+- id: Q-042
+  user: karan@pkc.com
+  question: "What compute rightsizing action does the Q4 2025 cloud optimization plan recommend, and what savings does it project?"
+  ground_truth: "The plan recommends downsizing 27% of t3.large and Standard_D4s_v3 instances to smaller sizes such as t3.medium, projecting ₹12.5 L in savings per quarter."
+  must_cite: ["eng-cloud-costs-optimization-q4"]
+  category: standard
+
+- id: Q-043
+  user: arjun@pkc.com
+  question: "What was PKC's total Q3 2025 marketing spend, and what was the overall campaign ROI?"
+  ground_truth: "Total Q3 2025 marketing spend was ₹4.28 crore, with overall ROI improving to ₹12.6 revenue per ₹1 spent, up from ₹10.8 in Q2 2025."
+  must_cite: ["sales-marketing-spend-q3-2025"]
+  category: standard
+
+- id: Q-044
+  user: arjun@pkc.com
+  question: "How much did PKC spend on digital advertising in Q3 2025, and what was the overall cost per lead?"
+  ground_truth: "PKC allocated ₹4.78 crore to digital advertising in Q3 2025, achieving an overall cost per lead of ₹3,860, down 12% YoY."
+  must_cite: ["sales-digital-ad-spend-q3-2025"]
+  category: standard
+
+- id: Q-045
+  user: arjun@pkc.com
+  question: "What was PKC's total FY2025 event sponsorship budget, and how much pipeline value did it generate?"
+  ground_truth: "PKC allocated ₹4.85 crore for FY2025 event sponsorships, generating an estimated ₹12.3 crore in incremental pipeline value."
+  must_cite: ["sales-event-sponsorship-2025"]
+  category: standard
+
+- id: Q-046
+  user: divya@pkc.com
+  question: "Which spend category was the largest contributor to Q3 2025 marketing spend?"
+  ground_truth: "Digital Advertising was the largest category at ₹1.62 crore, 37.8% of the ₹4.28 crore total Q3 2025 marketing spend."
+  must_cite: ["sales-marketing-spend-q3-2025"]
+  category: standard
+
+- id: Q-047
+  user: divya@pkc.com
+  question: "Which digital advertising channel had the highest ROAS in Q3 2025?"
+  ground_truth: "LinkedIn Sponsored Content had the highest ROAS at 3.1x, compared to an overall ROAS of 2.6x across all digital channels."
+  must_cite: ["sales-digital-ad-spend-q3-2025"]
+  category: standard
+
+- id: Q-048
+  user: divya@pkc.com
+  question: "Which event received the largest sponsorship spend in FY2025, and at what tier?"
+  ground_truth: "AI Expo India in Bengaluru (January 2025) received the largest spend at ₹1.15 crore as Title Sponsor."
+  must_cite: ["sales-event-sponsorship-2025"]
+  category: standard
+
+- id: Q-049
+  user: arjun@pkc.com
+  question: "What was the Q3 2025 revenue forecast for PKC, and what were the top revenue drivers behind it?"
+  ground_truth: "The Q3 2025 forecast projected net revenue of approximately ₹38.5 crore, driven by the Tata Motors Enterprise AI Suite renewal (+₹2.4 crore), a new PKC Cloud Platform contract with State Bank of India (+₹3.1 crore), and a healthcare AI pilot with Apollo Hospitals (+₹1.8 crore)."
+  must_cite: ["fin-q3-2025-forecast"]
+  category: conflicting_versions
+
+- id: Q-050
+  user: arjun@pkc.com
+  question: "What were PKC's actual Q3 2025 net revenue and net profit after tax, and how did revenue compare to the internal forecast?"
+  ground_truth: "Actual Q3 2025 net revenue was ₹42.7 crore with net profit after tax of ₹7.2 crore, surpassing the internal forecast of ₹39.3 crore by about ₹3.4 crore (roughly 8.6%)."
+  must_cite: ["fin-q3-2025-report"]
+  category: conflicting_versions
+
+- id: Q-051
+  user: arjun@pkc.com
+  question: "What is PKC's net annual AWS commitment under the enterprise agreement, and how does that compare to the Q3 2025 actual cloud spend reported by Engineering?"
+  ground_truth: "The AWS Enterprise Agreement's net annual commitment for FY2025-26 is ₹1.62 crore. Engineering's actual Q3 2025 AWS spend was ₹18.4 L, up 12% from Q2's ₹16.4 L, consistent with the contract's projected consumption ramp."
+  must_cite: ["fin-vendor-aws", "eng-cloud-costs-q3-2025"]
+  category: cross_ref
+
+- id: Q-052
+  user: divya@pkc.com
+  question: "What ARR target does PKC's 2026 go-to-market strategy set for FY-27, and which three verticals does it prioritize?"
+  ground_truth: "The GTM strategy targets ₹1,250 crore of new ARR by FY-27, prioritizing Banking & FinTech, Healthcare, and Smart Manufacturing."
+  must_cite: ["sales-gtm-strategy-2026"]
+  category: standard
+
+- id: Q-053
+  user: divya@pkc.com
+  question: "What is the total budget and lead-generation target for the PKC Assistant product launch campaign?"
+  ground_truth: "The campaign has a total spend of ₹2.5 crore and targets 3,200 qualified leads, aiming to convert 480 new subscriptions."
+  must_cite: ["sales-launch-campaign-pkc"]
+  category: standard
+
+- id: Q-054
+  user: divya@pkc.com
+  question: "What is PKC's current market share in the AI-automation segment per the brand positioning memo?"
+  ground_truth: "PKC's current market share stands at 3.2% in the AI-automation segment, against a forecast Indian enterprise AI spend of ₹1,200 crore by FY2025."
+  must_cite: ["sales-brand-positioning"]
+  category: standard
+
+- id: Q-055
+  user: divya@pkc.com
+  question: "Who are PKC's three primary competitors in the RAG Assistant market, and what market share is PKC targeting by FY2027?"
+  ground_truth: "The three primary competitors are CognifyAI, NexGen Labs, and GlobalMind. PKC aims to capture a 12-15% share of the Indian RAG Assistant market by FY2027."
+  must_cite: ["sales-competitor-analysis"]
+  category: standard
+
+- id: Q-056
+  user: divya@pkc.com
+  question: "What was PKC's total sales pipeline value in Q3 2025, and what was the win rate?"
+  ground_truth: "Q3 2025 pipeline value was ₹12.6 crore, up 14% quarter-over-quarter, with the win rate improving to 28% from 22% in Q2."
+  must_cite: ["sales-pipeline-q3-2025"]
+  category: standard
+
+- id: Q-057
+  user: divya@pkc.com
+  question: "What is the value of the Reliance Industries AI-Ops platform deal in the September 2025 enterprise pipeline, and when is sign-off targeted?"
+  ground_truth: "The Reliance Industries AI-Ops platform deal is worth ₹4.3 crore over a 3-year term, with sign-off targeted for 15 September 2025."
+  must_cite: ["sales-pipeline-enterprise-sep"]
+  category: standard
+
+- id: Q-058
+  user: divya@pkc.com
+  question: "What is the total Q4 2025 renewal pipeline value, and what is the weighted forecast?"
+  ground_truth: "The Q4 2025 renewal pipeline totals ₹12.8 crore across 27 contracts, with a weighted forecast of ₹8.7 crore at 68% confidence."
+  must_cite: ["sales-pipeline-renewal-q4"]
+  category: standard
+
+- id: Q-059
+  user: divya@pkc.com
+  question: "What is Global Retail Corp's projected FY2025 spend with PKC, and what new module is driving the growth?"
+  ground_truth: "Global Retail Corp's FY2025 spend is projected at ₹12.6 crore, a 28% YoY increase driven by the rollout of the new 'Smart Shelf' module."
+  must_cite: ["sales-account-global-retail"]
+  category: standard
+
+- id: Q-060
+  user: divya@pkc.com
+  question: "What is the annual contract value of PKC's partnership with Contoso Manufacturing, and what does the engagement cover?"
+  ground_truth: "The contract is valued at ₹4.2 crore per annum, with a 6% annual CPI escalation, covering AI-driven predictive maintenance and supply-chain optimization across three plants in Pune, Chennai, and Surat."
+  must_cite: ["sales-account-contoso"]
+  category: standard
+
+- id: Q-061
+  user: divya@pkc.com
+  question: "What is PKC's total Q3 2025 sales revenue target, and how is it split between Bengaluru and Austin?"
+  ground_truth: "The Q3 2025 target is ₹120 crore total: ₹68 crore Bengaluru Enterprise (56%) plus ₹22 crore Bengaluru Mid-Market (18%), together 74% of the total from Bengaluru, and ₹20 crore Austin Enterprise (17%) plus ₹10 crore Austin Emerging (9%), together 26% from Austin."
+  must_cite: ["sales-quota-q3-2025"]
+  category: standard
+
+- id: Q-062
+  user: divya@pkc.com
+  question: "What is PKC's total APAC sales target for FY2025-26, and which country has the largest allocation?"
+  ground_truth: "The total APAC target is ₹850 crore, with India holding the largest country allocation at ₹620 crore."
+  must_cite: ["sales-quota-apac"]
+  category: standard
+
+- id: Q-063
+  user: karan@pkc.com
+  question: "What is the target production release date for the PKC Assistant Platform v1.0, and what uptime SLA does it commit to?"
+  ground_truth: "PKAP v1.0 is slated for release on 15 Oct 2026, with an uptime SLA of 99.9% (monthly downtime of 43 minutes or less)."
+  must_cite: ["eng-architecture-overview"]
+  category: standard
+
+- id: Q-064
+  user: karan@pkc.com
+  question: "What is the total monthly OPEX for PKC's RAG pipeline, and which component is the most expensive?"
+  ground_truth: "Total monthly OPEX is ₹52.3 L (about ₹6.28 crore annually); the LLM Inference Engine is the most expensive single component at ₹22.3 L per month."
+  must_cite: ["eng-architecture-rag-pipeline"]
+  category: standard
+
+- id: Q-065
+  user: karan@pkc.com
+  question: "What identity provider and token format does PKC's SecureAuth authentication service use?"
+  ground_truth: "SecureAuth uses an OIDC-compliant identity provider built on Keycloak 25.0.0, federated with Azure AD and LDAP, and issues signed JWT (RS256) access tokens with a 15-minute expiry."
+  must_cite: ["eng-architecture-authz"]
+  category: standard
+
+- id: Q-066
+  user: karan@pkc.com
+  question: "What sustained data ingest rate does PKC's data pipeline architecture target, and what is its total FY2026-27 OPEX?"
+  ground_truth: "The architecture targets a sustained ingest rate of 5 TB/day with a 99.9% SLA for critical pipelines; total FY2026-27 OPEX is ₹9.8 crore."
+  must_cite: ["eng-architecture-data-pipeline"]
+  category: standard
+
+- id: Q-067
+  user: karan@pkc.com
+  question: "What is the planned deployment window and maximum allowed outage for PKC Core AI Platform release v3.7.2?"
+  ground_truth: "The deployment window is 02-04 October 2026, with a maximum allowed outage of 15 minutes per service tier."
+  must_cite: ["eng-runbook-deploy"]
+  category: standard
+
+- id: Q-068
+  user: karan@pkc.com
+  question: "What are the three incident severity levels in PKC's incident response runbook, and how is each classified?"
+  ground_truth: "S1 is a full service outage affecting 50% or more of users, S2 is degraded performance affecting 20% or more of users, and S3 is a minor issue affecting 20% or fewer users."
+  must_cite: ["eng-runbook-incident-response"]
+  category: standard
+
+- id: Q-069
+  user: karan@pkc.com
+  question: "What is PKC's daily database backup maintenance window, and which storage systems are used?"
+  ground_truth: "The daily maintenance window is 02:00-03:00 IST, using NetApp AFF-A300 in Bengaluru for primary backups and AWS S3 in US-East-1 for off-site copies."
+  must_cite: ["eng-runbook-db-backup"]
+  category: standard
+
+- id: Q-070
+  user: karan@pkc.com
+  question: "What is the on-call annual allowance for Bengaluru engineers, and how does coverage change on Indian public holidays?"
+  ground_truth: "Bengaluru on-call engineers receive about ₹12 L per annum (roughly ₹1 L per month); on Indian public holidays the Bengaluru roster is extended by one day, with the Austin team providing backup coverage."
+  must_cite: ["eng-runbook-oncall"]
+  category: standard
+
+- id: Q-071
+  user: karan@pkc.com
+  question: "How long did the September 2025 API outage last, and what was its estimated revenue impact?"
+  ground_truth: "The outage lasted 7 hours 45 minutes on 12 September 2025, causing an estimated ₹3.2 crore loss in billable usage plus ₹45 L in SLA breach penalties."
+  must_cite: ["eng-postmortem-api-outage-sep"]
+  category: standard
+
+- id: Q-072
+  user: karan@pkc.com
+  question: "What was the root cause of the August 2025 AuthX rate-limit incident?"
+  ground_truth: "A configuration flag, CACHE_INVALIDATE_ON_REFRESH, was mistakenly set to false in the production Helm chart during the v2.4.1 release, causing stale token entries to accumulate in Redis and triggering cascading rate-limit breaches."
+  must_cite: ["eng-postmortem-rate-limit-aug"]
+  category: standard
+
+- id: Q-073
+  user: karan@pkc.com
+  question: "How many critical findings came out of the Q3 2025 penetration test, and what was one of them?"
+  ground_truth: "There were three critical findings, including an unauthenticated remote code execution vulnerability (CVE-2025-1123) in the customer portal, exploited via a deserialization flaw in the payment microservice."
+  must_cite: ["eng-security-pentest-q3-2025"]
+  category: standard
+
+- id: Q-074
+  user: meera@pkc.com
+  question: "What was PKC's Q2 2025 revenue and EBITDA per the board deck, and which product drove the growth?"
+  ground_truth: "Q2 2025 revenue was ₹12.6 crore (up 28% YoY) with EBITDA of ₹3.4 crore. PKC-Insight, which went GA on 12 May 2025, contributed ₹4.2 crore, or 33% of total revenue."
+  must_cite: ["exec-board-deck-q2-2025"]
+  category: standard
+
+- id: Q-075
+  user: meera@pkc.com
+  question: "What FY2026 revenue target and capital expenditure did the board approve in the Q3 2025 board deck?"
+  ground_truth: "The board approved a FY2026 revenue target of ₹5,200 crore and ₹1,200 crore in capex, alongside a ₹12 crore dividend payout (₹2 per share)."
+  must_cite: ["exec-board-deck-q3-2025"]
+  category: standard
+
+- id: Q-076
+  user: meera@pkc.com
+  question: "What was the confidential board-only rationale for closing the PKC Edge sub-team in the September 2025 special session?"
+  ground_truth: "Internally, the board cited PKC Edge's strategic mis-fit (an obsolete TensorFlow Lite v1 stack versus the company-wide migration to PyTorch 2.0), margin erosion (28% gross margin against a 45% target), and a 38% Q2 2025 attrition risk among Edge engineers, plus a latent IP overlap with a competitor's pending patent filing."
+  must_cite: ["exec-board-deck-sep-special"]
+  category: standard
+
+- id: Q-077
+  user: meera@pkc.com
+  question: "What FY2026-27 revenue target does the 2026 Strategic Priorities Memo set, and what is the planned R&D spend?"
+  ground_truth: "The memo targets ₹1,250 crore in total revenue (up 22% YoY) for FY2026-27, with R&D spend of ₹210 crore, about 17% of revenue."
+  must_cite: ["exec-strategy-2026-priorities"]
+  category: standard
+
+- id: Q-078
+  user: meera@pkc.com
+  question: "What is PKC's projected FY2025-26 revenue, and what market share does it hold in the Generative AI SaaS segment?"
+  ground_truth: "FY2025-26 revenue is projected at ₹1,842 crore (up 28% YoY). PKC holds a 3.4% share of the ₹9,300 crore global Generative AI SaaS market."
+  must_cite: ["exec-strategy-competitive-positioning"]
+  category: standard
+
+- id: Q-079
+  user: meera@pkc.com
+  question: "What is the combined FY-24 revenue of the three companies under M&A exploration, and what is the estimated total deal size?"
+  ground_truth: "The three targets (DataMitra Solutions, NeuroEdge Labs, and SutraSoft Pvt. Ltd.) collectively generate ₹1,845 crore in FY-24 revenue. The estimated total deal size is ₹420 crore, inclusive of earn-outs and integration costs."
+  must_cite: ["exec-ma-acquisition-targets"]
+  category: standard
+
+- id: Q-080
+  user: meera@pkc.com
+  question: "What headcount reduction and net cost saving does PKC's 2026 workforce restructuring plan target?"
+  ground_truth: "The plan targets a 4.2% headcount reduction, roughly 210 employees, while reallocating talent to AI-ops and Cloud-Native divisions, with an expected net cost saving of ₹15.8 crore in FY-27."
+  must_cite: ["exec-restructuring-workforce-2026"]
+  category: standard

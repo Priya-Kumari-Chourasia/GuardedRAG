@@ -4,3 +4,11 @@ __pycache__/
 *.pyc
 *.db
 .pytest_cache/
+
+# evals/run_evals.py output -- regenerated every run. baseline.json is the one
+# exception: PLAN.md task 5.7 commits it deliberately so regressions are
+# measurable across commits. judge_cache.json persists across CI runs via
+# actions/cache instead of git (see .github/workflows/evals.yml) -- committing
+# it would just be repeated merge-conflict noise on a file nobody hand-edits.
+evals/results/*.json
+!evals/results/baseline.json

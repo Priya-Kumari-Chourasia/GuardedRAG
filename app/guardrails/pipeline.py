@@ -30,6 +30,14 @@ class PipelineResult:
     input_pii_redacted: bool = False
     output_pii_redacted: bool = False
     stage_latencies_ms: dict[str, int] = field(default_factory=dict)
+    # Diagnostic only -- never shown to the end user, never used for control flow.
+    # Added because every BLOCKED_UNGROUNDED verdict looked identical from the
+    # outside (SEC-038..045 investigation, PLAN.md 5.7): G5's PII-scan-exception
+    # path, G6's real "not grounded" check, and G7's citation-retry-exhausted
+    # path all returned the exact same verdict+REFUSAL_TEMPLATE with no way to
+    # tell which one actually fired short of re-instrumenting the code. This
+    # field exists so that question never has to be re-asked from scratch again.
+    block_reason: str | None = None
 
 
 def _refused(
@@ -39,14 +47,21 @@ def _refused(
     question_used: str,
     latencies: dict[str, int],
     input_pii_redacted: bool = False,
+    block_reason: str | None = None,
+    hits: list[Hit] | None = None,
 ) -> PipelineResult:
+    # hits defaults to [] (not preserved) for the G1-G4 stages, which run BEFORE
+    # retrieval and never have any hits to preserve in the first place -- only
+    # the _postprocess() call sites (G5-G7, after retrieval) pass hits=hits.
     return PipelineResult(
         answer=answer,
         citations=[],
         verdict=verdict,
         question_used=question_used,
+        hits=hits or [],
         stage_latencies_ms=latencies,
         input_pii_redacted=input_pii_redacted,
+        block_reason=block_reason,
     )
 
 
@@ -88,7 +103,8 @@ async def run_pipeline(
             request_id=request_id,
             detail=f"stage=G1_injection error={exc!r}",
         )
-        return _refused(Verdict.BLOCKED_INJECTION, REFUSAL_TEMPLATE, question_used=question, latencies=latencies)
+        return _refused(Verdict.BLOCKED_INJECTION, REFUSAL_TEMPLATE, question_used=question, latencies=latencies,
+                         block_reason="G1_injection_exception")
     stage_done("G1_injection", t0)
 
     if injection_result.blocked:
@@ -99,7 +115,8 @@ async def run_pipeline(
             request_id=request_id,
             detail=f"score={injection_result.score:.4f}",
         )
-        return _refused(Verdict.BLOCKED_INJECTION, REFUSAL_TEMPLATE, question_used=question, latencies=latencies)
+        return _refused(Verdict.BLOCKED_INJECTION, REFUSAL_TEMPLATE, question_used=question, latencies=latencies,
+                         block_reason=f"G1_injection_blocked (score={injection_result.score:.4f})")
 
     # --- G2: input PII -------------------------------------------------------
     # Non-blocking by design (SPEC action: "redact ... warn inline") -- asking
@@ -118,7 +135,8 @@ async def run_pipeline(
             request_id=request_id,
             detail=f"stage=G2_input_pii error={exc!r}",
         )
-        return _refused(Verdict.BLOCKED_PII, REFUSAL_TEMPLATE, question_used=question, latencies=latencies)
+        return _refused(Verdict.BLOCKED_PII, REFUSAL_TEMPLATE, question_used=question, latencies=latencies,
+                         block_reason="G2_input_pii_exception")
     stage_done("G2_input_pii", t0)
 
     if input_pii.redacted:
@@ -152,6 +170,7 @@ async def run_pipeline(
             question_used=question,
             latencies=latencies,
             input_pii_redacted=input_pii.redacted,
+            block_reason="G3_scope_exception",
         )
     stage_done("G3_scope", t0)
 
@@ -162,6 +181,8 @@ async def run_pipeline(
             question_used=question,
             latencies=latencies,
             input_pii_redacted=input_pii.redacted,
+            block_reason=f"G3_out_of_scope (cosine={scope_result.cosine:.4f}, "
+            f"tiebreak_used={scope_result.tiebreak_used})",
         )
 
     # --- G4: budget ------------------------------------------------------------
@@ -187,6 +208,7 @@ async def run_pipeline(
             question_used=question,
             latencies=latencies,
             input_pii_redacted=input_pii.redacted,
+            block_reason="G4_budget_exception",
         )
     stage_done("G4_budget", t0)
 
@@ -204,6 +226,7 @@ async def run_pipeline(
             question_used=question,
             latencies=latencies,
             input_pii_redacted=input_pii.redacted,
+            block_reason=f"G4_budget_exceeded (tokens_used_today={tokens_used_today})",
         )
 
     # --- retrieval + generation (not a guardrail stage; the security border
@@ -278,7 +301,7 @@ async def _postprocess(
         )
         return _refused(
             Verdict.BLOCKED_PII, REFUSAL_TEMPLATE, question_used=question, latencies=latencies,
-            input_pii_redacted=input_pii_redacted,
+            input_pii_redacted=input_pii_redacted, block_reason="G5_output_pii_exception", hits=hits,
         )
     stage_done_key = "G5_output_pii" if "G5_output_pii" not in latencies else "G5_output_pii_retry"
     latencies[stage_done_key] = int((time.monotonic() - t0) * 1000)
@@ -310,7 +333,7 @@ async def _postprocess(
             )
             return _refused(
                 Verdict.BLOCKED_UNGROUNDED, REFUSAL_TEMPLATE, question_used=question, latencies=latencies,
-                input_pii_redacted=input_pii_redacted,
+                input_pii_redacted=input_pii_redacted, block_reason="G6_groundedness_exception", hits=hits,
             )
         key = "G6_groundedness" if "G6_groundedness" not in latencies else "G6_groundedness_retry"
         latencies[key] = int((time.monotonic() - t0) * 1000)
@@ -320,6 +343,9 @@ async def _postprocess(
             return _refused(
                 Verdict.BLOCKED_UNGROUNDED, REFUSAL_TEMPLATE, question_used=question, latencies=latencies,
                 input_pii_redacted=input_pii_redacted,
+                block_reason=f"G6_not_grounded (score={ground.score:.4f}, "
+                f"threshold={settings.faithfulness_threshold}, retry_used={not allow_retry})",
+                hits=hits,
             )
 
     # --- G7: citation presence --------------------------------------------
@@ -340,6 +366,7 @@ async def _postprocess(
         return _refused(
             Verdict.BLOCKED_UNGROUNDED, REFUSAL_TEMPLATE, question_used=question, latencies=latencies,
             input_pii_redacted=input_pii_redacted,
+            block_reason="G7_citation_retry_exhausted", hits=hits,
         )
 
     return PipelineResult(

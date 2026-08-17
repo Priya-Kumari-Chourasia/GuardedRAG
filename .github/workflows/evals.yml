@@ -1,0 +1,137 @@
+# PLAN.md task 5.6 -- CI gate per SPEC_1.md Sec 7.4.
+#
+# On every PR to main: spin up a throwaway Qdrant (service container, not the
+# project's Qdrant Cloud instance -- this run must never touch or depend on
+# production state), ingest the 25-doc fixture corpus, run all three golden
+# suites scoped to that fixture, and fail the job if any SPEC Sec 7 hard gate
+# fails or any quality metric regresses >5% vs evals/results/baseline.json.
+# Runs on ubuntu-latest (not Windows): GitHub-hosted Linux runners are the
+# free-tier default and start faster; nothing here is Windows-specific -- the
+# FastEmbed/onnxruntime thread-deadlock CLAUDE.md warns about is a Windows-only
+# hazard (see evals/run_evals.py's _fastembed_langchain_adapter comment).
+name: evals
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+
+    services:
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+
+    env:
+      QDRANT_URL: http://localhost:6333
+      QDRANT_COLLECTION: pkc_tech_ci
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      LEDGER_DB_PATH: data/ledger.db
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      # SPEC Sec 7.4: judge results are cached by content hash so re-runs are
+      # cheap (Groq free tier is the binding constraint project-wide, CLAUDE.md).
+      # Persisting the cache file across CI runs -- not just within one --
+      # means a PR pushed twice with no golden-set/model changes re-judges
+      # nothing the second time.
+      - name: Cache Ragas judge results
+        uses: actions/cache@v4
+        with:
+          path: evals/results/judge_cache.json
+          key: judge-cache-${{ hashFiles('data/golden/*.yaml') }}
+          restore-keys: judge-cache-
+
+      # Case-run cache (evals/run_evals.py's RUN_CACHE_PATH): if a run hits a
+      # Groq TPD rate limit partway through, the job fails but every case that
+      # DID complete is cached -- the next push/retry on the same PR resumes
+      # instead of re-paying Groq for cases already answered.
+      - name: Cache pipeline run results
+        uses: actions/cache@v4
+        with:
+          path: evals/results/run_cache.json
+          key: run-cache-${{ github.event.pull_request.number || 'main' }}-${{ hashFiles('data/golden/*.yaml') }}
+          restore-keys: |
+            run-cache-${{ github.event.pull_request.number || 'main' }}-
+            run-cache-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Wait for Qdrant
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:6333/collections && exit 0
+            sleep 1
+          done
+          echo "Qdrant never became ready" && exit 1
+
+      - name: Create collection + ACL payload index
+        run: python -m scripts.setup_collection
+
+      - name: Seed demo users
+        run: python -m scripts.seed_users
+
+      - name: Ingest 25-doc fixture corpus
+        run: python -m scripts.ingest --fixture data/golden/fixture_docs.txt
+
+      # SPEC's required security tests (CLAUDE.md layout: "test_acl_matrix.py ·
+      # test_acl_antipatterns.py (required)") plus every other unit/guardrail
+      # test -- all run against this same fixture-backed Qdrant instance.
+      - name: Run test suite
+        run: pytest tests/ -v
+
+      - name: Run eval suites against fixture
+        id: run_evals
+        run: |
+          set +e
+          python -m evals.run_evals \
+            --suite all \
+            --fixture-docs data/golden/fixture_docs.txt \
+            --out evals/results/latest.json \
+            --baseline evals/results/baseline.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Format PR comment
+        if: always() && github.event_name == 'pull_request'
+        run: python -m evals.format_pr_comment evals/results/latest.json > pr_comment.md
+
+      - name: Post PR comment
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment "${{ github.event.pull_request.number }}" --body-file pr_comment.md
+
+      - name: Upload full results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: evals/results/latest.json
+
+      - name: Fail the job if any gate failed
+        if: steps.run_evals.outputs.exit_code != '0'
+        run: |
+          echo "Eval gate failed (SPEC_1.md Sec 7 -- leak_rate==0, injection_block_rate>=0.95, faithfulness>=0.85, or a >5% regression vs baseline). See the PR comment / eval-results artifact for detail."
+          exit 1
