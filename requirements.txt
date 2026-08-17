@@ -1,10 +1,10 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.13.4
-pydantic-settings==2.7.0
+pydantic-settings==2.15.0
 python-dotenv==1.0.1
 tenacity==9.0.0
-groq==0.15.0
+groq==0.37.1
 qdrant-client==1.12.2
 pytest==8.3.4
 fastembed==0.8.0
@@ -15,6 +15,14 @@ numpy==2.4.6
 presidio-analyzer==2.2.364
 presidio-anonymizer==2.2.364
 
+# groq==0.37.1 (was 0.15.0) and pydantic-settings==2.15.0 (was 2.7.0), both bumped
+# 2026-08-17: langchain-groq==0.3.7 below requires groq<1,>=0.30.0 -- 0.15.0 is outside
+# that range, which pip's local venv silently tolerated (groq was already installed
+# and satisfied-enough before langchain-groq was ever added, so nothing forced a
+# re-resolve) but a CLEAN install -- exactly what CI does -- hit it immediately:
+# ResolutionImpossible. pydantic-settings wasn't a hard conflict (2.7.0 still satisfies
+# langchain-community's pydantic-settings<3.0.0,>=2.4.0) but was bumped to match what
+# had actually been installed and tested all along, not a pin nobody ever ran against.
 # --- Phase 5 evals (SPEC_1.md Sec 11.1-style fallback -- see PLAN.md task 5.4) ---
 # `pip install ragas` alone resolves to ragas==0.4.3 + langchain==1.3.x, an untested
 # combo where ragas.llms.base imports langchain_community.chat_models.vertexai, a path
