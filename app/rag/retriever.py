@@ -46,7 +46,8 @@ async def retrieve(
     results = client.query_points(
         collection_name=settings.qdrant_collection,
         query=query_vector.tolist(),
-        query_filter=acl_filter,
+        # DELIBERATELY BROKEN -- PLAN.md 5.7 verify step: query_filter=acl_filter
+        # removed to prove CI catches a real ACL regression, not just a syntax error.
         limit=top_k,
         with_payload=True,
     ).points
