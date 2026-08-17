@@ -12,7 +12,17 @@ class Settings(BaseSettings):
     # --- Groq (LLM) ---
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
     groq_model_primary: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL_PRIMARY")
-    groq_model_fallback: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL_FALLBACK")
+    # llama-3.3-70b-versatile was deprecated/removed from Groq's catalog (discovered
+    # 2026-08-17 -- calls started 404ing: "does not exist or you do not have access to
+    # it"). allam-2-7b replaces it: verified it produces fast, cheap, non-reasoning
+    # output for the terse classify()-style calls this fallback is mostly used for
+    # (G6 groundedness score, the eval harness's compliance judge) -- the other two
+    # currently-available general chat models, openai/gpt-oss-20b and qwen/qwen3.6-27b,
+    # both burn 50-200+ tokens of internal <think> reasoning before any usable output
+    # (openai/gpt-oss-20b: empty response at max_tokens=16, needs ~100-200; qwen: raw
+    # <think>... leaks straight into the response text), which would make the already
+    # tight free-tier Groq quota (CLAUDE.md) meaningfully worse for every G6 call.
+    groq_model_fallback: str = Field(default="allam-2-7b", alias="GROQ_MODEL_FALLBACK")
     groq_guard_model: str = Field(default="meta-llama/llama-prompt-guard-2-86m", alias="GROQ_GUARD_MODEL")
     groq_max_concurrency: int = Field(default=2, alias="GROQ_MAX_CONCURRENCY")
 
