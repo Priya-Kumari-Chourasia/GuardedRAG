@@ -25,6 +25,26 @@ class GroundednessResult:
     grounded: bool
 
 
+# GROQ_MODEL_FALLBACK's context window is much smaller than the model this judge
+# used to run on (empirically found 2026-08-17: allam-2-7b accepts ~3000 prompt
+# tokens, fails above ~4000 -- see app/core/config.py's groq_model_fallback comment
+# for why that model was chosen anyway). retrieve()'s top_k=8 chunks at
+# ingest.py's CHUNK_TARGET_TOKENS=512 can alone reach ~4096 tokens, before the
+# prompt template or answer are even added -- comfortably over the limit for
+# retrieval-heavy questions. Truncating here (word-based, matching ingest.py's
+# own TOKENS_PER_WORD approximation convention) trades a small loss of judge
+# visibility into the tail of the context for never hard-failing G6 on a
+# legitimately-answerable question purely because of judge-model context size.
+_MAX_CONTEXT_WORDS = 2000
+
+
+def _truncate_context(context: str) -> str:
+    words = context.split()
+    if len(words) <= _MAX_CONTEXT_WORDS:
+        return context
+    return " ".join(words[:_MAX_CONTEXT_WORDS])
+
+
 async def check_groundedness(answer: str, context: str) -> GroundednessResult:
     """G6, feature-flagged via ENABLE_GROUNDEDNESS_CHECK -- see pipeline.py for
     where that flag is read and the latency delta this stage adds. Reuses
@@ -34,7 +54,7 @@ async def check_groundedness(answer: str, context: str) -> GroundednessResult:
     turns out to need a different model.
     """
     settings = get_settings()
-    prompt = _JUDGE_PROMPT.format(context=context, answer=answer)
+    prompt = _JUDGE_PROMPT.format(context=_truncate_context(context), answer=answer)
     resp = await get_groq_client().classify(settings.groq_model_fallback, [{"role": "user", "content": prompt}])
     score = float(resp.text.strip())
     score = max(0.0, min(1.0, score))
