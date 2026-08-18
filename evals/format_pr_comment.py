@@ -24,8 +24,11 @@ def _suite_line(name: str, data: dict) -> str:
     elif name == "adversarial":
         detail = f"injection_block_rate={data['injection_block_rate']}"
     elif name == "quality":
-        metrics = ", ".join(f"{m}={data[m]}" for m in
-                             ("context_precision", "context_recall", "faithfulness", "answer_relevancy"))
+        coverage = data.get("metric_coverage") or {}
+        metrics = ", ".join(
+            f"{m}={data[m]} (n={coverage.get(m, '?')})"
+            for m in ("context_precision", "context_recall", "faithfulness", "answer_relevancy")
+        )
         detail = metrics
     else:
         detail = ""

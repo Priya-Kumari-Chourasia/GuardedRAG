@@ -189,14 +189,12 @@ def _hash_payload(payload: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _has_nan(scores: dict) -> bool:
-    """ragas.evaluate(raise_exceptions=False) doesn't raise when a judge call
-    is rate-limited mid-evaluation -- it fills that case's metrics with NaN
-    and moves on. NaN is a legitimate float, not None, so a plain `is not
-    None` cache check would treat a NaN-filled (i.e. never actually judged)
-    entry as a permanent cache hit. NaN != NaN is the standard float idiom for
-    detecting it without importing math.isnan."""
-    return any(v != v for v in scores.values())
+def _all_nan(scores: dict) -> bool:
+    """Distinguishes a fully-blocked judge call (every metric NaN -- looks like
+    a genuine rate limit, worth retrying) from a partial one (SOME real metrics
+    -- see score_quality's cache-write comment for why partial results are
+    trusted and cached rather than discarded)."""
+    return all(v != v for v in scores.values())
 
 
 # --------------------------------------------------------------------------
@@ -497,7 +495,14 @@ def score_quality(cases: list[dict], runs: dict[str, CaseRun], cache: JudgeCache
             "reference": case["ground_truth"],
         })
         cached = cache.get(key)
-        if cached is not None and not _has_nan(cached):
+        # A cached entry with SOME real (non-NaN) metrics is kept even if others
+        # are NaN -- see the write-side comment below for why (2026-08-18 finding:
+        # context_recall/faithfulness fail structurally for most cases with the
+        # current judge model, not transiently, so retrying wastes quota without
+        # changing the outcome). Only an entry with ALL FOUR NaN is treated as a
+        # cache miss and retried -- that pattern looks like a genuine rate-limited
+        # request (every metric call blocked together), worth another attempt.
+        if cached is not None and not _all_nan(cached):
             per_case_scores[case["id"]] = cached
         else:
             to_judge.append({"case": case, "run": run, "key": key})
@@ -512,8 +517,16 @@ def score_quality(cases: list[dict], runs: dict[str, CaseRun], cache: JudgeCache
             }
             for item in to_judge
         ])
+        # groq_model_fallback, not groq_model_primary: this judge and every real
+        # generation call in the quality suite's own pipeline phase would otherwise
+        # compete for the SAME model's daily TPD pool. Primary is the scarcer
+        # resource (every pipeline call across all three suites needs it); routing
+        # the judge to fallback's separate pool means a primary-exhausted day still
+        # leaves quality judging possible, and vice versa. Confirmed live 2026-08-17:
+        # primary sat at 199668/200000 TPD (fully exhausted) while fallback had
+        # real headroom -- this is exactly the scenario that motivated the split.
         llm = LangchainLLMWrapper(ChatGroq(
-            model_name=settings.groq_model_primary,
+            model_name=settings.groq_model_fallback,
             groq_api_key=settings.groq_api_key,
             temperature=0.0,
             max_retries=6,
@@ -532,29 +545,42 @@ def score_quality(cases: list[dict], runs: dict[str, CaseRun], cache: JudgeCache
         for item, (_, row) in zip(to_judge, df.iterrows()):
             scores = {metric: float(row.get(metric, float("nan"))) for metric in QUALITY_GATES}
             per_case_scores[item["case"]["id"]] = scores
-            # Only cache a genuinely-judged result. Caching a NaN-filled one (Ragas'
-            # own rate-limit path, not a crash) would make it a permanent false
-            # cache hit -- the case would never get re-judged on a later retry.
-            if not _has_nan(scores):
+            # Cache any result with at least one real metric. Originally this only
+            # cached fully-real (zero-NaN) results, on the assumption that NaN meant
+            # transient rate-limiting -- but a 2026-08-18 investigation (PLAN.md 5.7)
+            # found context_recall/faithfulness fail for the SAME cases across
+            # repeated full runs: not random rate-limiting, a structural mismatch
+            # between the current judge model (routed to groq_model_fallback, see
+            # the comment above) and Ragas' more complex multi-step prompts for
+            # those two metrics specifically. Re-running never recovered them, so
+            # caching only full successes meant paying to re-derive the SAME
+            # partial result (e.g. a real answer_relevancy) every single run.
+            # Only an all-four-NaN result is left uncached -- that pattern still
+            # looks like a genuine blocked request, worth retrying.
+            if not _all_nan(scores):
                 cache.set(item["key"], scores)
 
-    # Cases whose judge call never produced a real score (NaN) are reported, not
-    # silently averaged away -- CLAUDE.md: never mark something complete if it
-    # was silently skipped. They're excluded from the aggregate the same way
-    # dropping NaN already did; the difference is they're now visible.
-    judge_errors = [{"id": cid, "error": "ragas judge returned NaN (likely rate-limited)"}
-                     for cid, s in per_case_scores.items() if _has_nan(s)]
+    # A case where EVERY metric came back NaN never produced any real signal --
+    # reported, not silently averaged away (CLAUDE.md: never mark something
+    # complete if it was silently skipped). Cases with SOME real metrics are NOT
+    # errors: they contribute real data to the per-metric aggregates below, just
+    # not to every metric.
+    judge_errors = [{"id": cid, "error": "ragas judge returned NaN on every metric"}
+                     for cid, s in per_case_scores.items() if _all_nan(s)]
 
     aggregate: dict[str, float] = {}
+    metric_coverage: dict[str, int] = {}
     for metric in QUALITY_GATES:
         vals = [s[metric] for s in per_case_scores.values() if s.get(metric) == s.get(metric)]  # drop NaN
         aggregate[metric] = round(statistics.mean(vals), 4) if vals else 0.0
+        metric_coverage[metric] = len(vals)
 
     citation_hits = sum(1 for c in cases if any(d in runs[c["id"]].citations for d in c["must_cite"]))
     aggregate["citation_hit_rate"] = round(citation_hits / len(cases), 4) if cases else 0.0
 
     gate_pass = all(aggregate[m] >= floor for m, floor in QUALITY_GATES.items())
-    return {"n": len(cases) - len(judge_errors), **aggregate, "per_case": per_case_scores,
+    return {"n": len(cases) - len(judge_errors), "metric_coverage": metric_coverage,
+            **aggregate, "per_case": per_case_scores,
             "judge_errors": judge_errors, "gate_pass": gate_pass}
 
 
